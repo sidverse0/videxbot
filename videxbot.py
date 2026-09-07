@@ -2,6 +2,7 @@ import os
 import logging
 import asyncio
 import requests
+from urllib.parse import urlencode
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
@@ -65,9 +66,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text("❌ Unsupported platform.")
         return
 
-    api_url = f"{API_BASE_URL}{endpoint}?url={url}"
+    api_url = f"{API_BASE_URL}{endpoint}"
     try:
-        response = requests.get(api_url, timeout=60)
+        # Use params to automatically URL-encode the 'url' parameter
+        response = requests.get(api_url, params={'url': url}, timeout=60)
+        
+        # If 502, retry once after a short sleep (maybe API sleeping)
+        if response.status_code == 502:
+            await asyncio.sleep(5)
+            response = requests.get(api_url, params={'url': url}, timeout=60)
+        
         response.raise_for_status()
         data = response.json()
     except Exception as e:
